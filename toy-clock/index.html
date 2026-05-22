@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Clock Teacher">
+  <meta name="theme-color" content="#4A8FD9">
+  <title>Clock Teacher 🕐</title>
+
+  <!--
+  ════════════════════════════════════════════
+  ICON WIRING — three lines, three purposes
+  ════════════════════════════════════════════
+
+  1. SVG favicon (browser tab / bookmarks)
+     → already embedded below as a data URI, no file needed
+
+  2. Apple touch icon (iOS "Add to Home Screen")
+     → save a 180×180 PNG as  icons/apple-touch-icon.png
+
+  3. PWA manifest (install prompt / splash screen)
+     → save manifest.json in the same folder (content at bottom of file)
+
+  Quickest way to generate all icon sizes at once:
+     https://realfavicongenerator.net
+  Upload any square image, download the zip, drop the files into
+  your project root, and paste the <head> snippet it provides
+  here in place of lines ①–③ below.
+  ════════════════════════════════════════════
+  -->
+
+  <!-- ① SVG favicon — already embedded, works as-is -->
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='white' stroke='%234a8fd9' stroke-width='7'/><line x1='50' y1='50' x2='24' y2='35' stroke='%231a1e62' stroke-width='8' stroke-linecap='round'/><line x1='50' y1='50' x2='80' y2='32' stroke='%232e6ed0' stroke-width='5' stroke-linecap='round'/><circle cx='50' cy='50' r='5' fill='%231a1e62'/></svg>">
+
+  <!-- ② Apple touch icon — needs icons/apple-touch-icon.png (180×180 px) -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- ③ PWA manifest — needs manifest.json in same folder (content at bottom) -->
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;   /* dynamic viewport on mobile */
+    }
+
+    body {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      /* matches Swift: LinearGradient topLeading→bottomTrailing */
+      background: linear-gradient(135deg, #e0f0ff 0%, #c2dcfa 60%, #b6d0f4 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* Decorative background orbs — match Swift's two white opacity circles */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.22);
+      pointer-events: none;
+    }
+    .orb1 { width: 58vw; height: 58vw; top: -20vw;  left: -20vw;  }
+    .orb2 { width: 42vw; height: 42vw; bottom: -13vw; right: -11vw; }
+
+    /* ── Title ── */
+    h1 {
+      font-size: clamp(1rem, 3.8vw, 1.7rem);
+      font-weight: 800;
+      color: #1a3870;
+      letter-spacing: -0.01em;
+      margin-bottom: clamp(10px, 2.5vh, 22px);
+    }
+
+    /* ── Clock wrapper ── */
+    .clock-wrap {
+      position: relative;
+      cursor: pointer;
+    }
+    .clock-wrap svg {
+      display: block;
+      width:  min(80vw, 70vh);
+      height: min(80vw, 70vh);
+      filter: drop-shadow(0 6px 22px rgba(30, 80, 190, 0.15));
+    }
+
+    /* ── Ripple ring — sits just outside the SVG edge ── */
+    .ripple-ring {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      pointer-events: none;
+    }
+    .ripple-ring.pop {
+      animation: ripple-pop 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    @keyframes ripple-pop {
+      0%   { transform: scale(1);    border-color: rgba(80, 150, 255, 0.78); }
+      100% { transform: scale(1.26); border-color: rgba(80, 150, 255, 0);    }
+    }
+
+    /* ── Digital display (matches Swift DigitalTimeView pill) ── */
+    .digital {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 2rem;
+      padding: 0.45em 1.3em 0.5em;
+      margin-top: clamp(12px, 2.8vh, 24px);
+      box-shadow: 0 3px 14px rgba(30, 80, 180, 0.1);
+    }
+    .digital .hm {
+      font-size: clamp(1.4rem, 5vw, 2.2rem);
+      font-weight: 800;
+      color: #1a3870;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .digital .ampm {
+      font-size: clamp(0.7rem, 2vw, 0.95rem);
+      font-weight: 600;
+      color: #4a78b8;
+    }
+
+    /* ── Tap hint ── */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+      margin-top: clamp(10px, 2vh, 18px);
+      color: rgba(26, 72, 168, 0.7);
+      font-size: clamp(0.75rem, 2.2vw, 1rem);
+      font-weight: 500;
+      transition: opacity 0.5s ease;
+    }
+    .hint.hidden { opacity: 0; pointer-events: none; }
+
+    .hint-icon {
+      display: inline-block;
+      animation: tap-bob 2s ease-in-out infinite;
+    }
+    @keyframes tap-bob {
+      0%,  100% { transform: scale(1)    translateY(0);    opacity: 1;   }
+      50%        { transform: scale(1.22) translateY(-2px); opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background orbs -->
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<h1>What time is it? 🕐</h1>
+
+<!-- ── Clock ── -->
+<div class="clock-wrap" id="clockWrap" onclick="onTap()">
+  <div class="ripple-ring" id="rippleRing"></div>
+
+  <svg id="clockSvg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="faceGrad" cx="38%" cy="32%" r="68%">
+        <stop offset="0%"   stop-color="#ffffff"/>
+        <stop offset="100%" stop-color="#eef5ff"/>
+      </radialGradient>
+      <linearGradient id="ringGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#74b4f8"/>
+        <stop offset="100%" stop-color="#3a78d0"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Face -->
+    <circle cx="200" cy="200" r="190" fill="url(#faceGrad)"/>
+    <!-- Blue border ring (matches Swift strokeBorder) -->
+    <circle cx="200" cy="200" r="186" fill="none"
+            stroke="url(#ringGrad)" stroke-width="8"/>
+    <!-- Inner decorative ring -->
+    <circle cx="200" cy="200" r="164" fill="none"
+            stroke="#cce0f8" stroke-width="1"/>
+
+    <!-- Tick marks — built by JS -->
+    <g id="ticks"></g>
+
+    <!--
+      MINUTE NUMBERS (outer ring) — 5, 10, 15 … 60
+      Placed between the hour-number ring and the tick marks.
+      Radius 150 keeps clear of both the hour numbers (108)
+      and the major ticks (which start at 166).
+    -->
+    <g id="minNums"></g>
+
+    <!-- Hour numbers (inner ring) — built by JS -->
+    <g id="hrNums"></g>
+
+    <!--
+      HANDS — each drawn pointing straight UP (12 o'clock).
+      JS applies rotate(deg, 200, 200) to move them to real time.
+
+      Lengths mirror ClockTeacher.swift proportions (r ≈ 190):
+        Hour:   tip  r=99  (y=101), tail r=19 (y=219)
+        Minute: tip  r=141 (y=59),  tail r=23 (y=223)
+        Second: tip  r=148 (y=52),  tail r=34 (y=234)
+    -->
+    <line id="hHand" x1="200" y1="219" x2="200" y2="101"
+          stroke="#1a1e62" stroke-width="15" stroke-linecap="round"/>
+    <line id="mHand" x1="200" y1="223" x2="200" y2="59"
+          stroke="#2e6ed0" stroke-width="10" stroke-linecap="round"/>
+    <line id="sHand" x1="200" y1="234" x2="200" y2="52"
+          stroke="#e8483a" stroke-width="4"  stroke-linecap="round"/>
+
+    <!-- Center caps — navy outer, coral inner -->
+    <circle cx="200" cy="200" r="12" fill="#1a1e62"/>
+    <circle cx="200" cy="200" r="6"  fill="#e8483a"/>
+  </svg>
+</div>
+
+<!-- Digital time -->
+<div class="digital">
+  <span class="hm"   id="digTime">12:00</span>
+  <span class="ampm" id="digAmPm">AM</span>
+</div>
+
+<!-- Tap hint -->
+<div class="hint" id="hint">
+  <span class="hint-icon">👆</span>
+  Tap the clock to hear the time!
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  BUILD STATIC DIAL ELEMENTS
+// ═══════════════════════════════════════════════════════════
+const NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+// Convert polar coords (radius, degrees from 12 o'clock) → SVG x, y
+function pt(r, deg) {
+  const a = (deg - 90) * Math.PI / 180;
+  return [200 + r * Math.cos(a), 200 + r * Math.sin(a)];
+}
+
+// ── Tick marks ──────────────────────────────────────────────
+const tg = document.getElementById('ticks');
+for (let i = 0; i < 60; i++) {
+  const major = i % 5 === 0;
+  const [x1, y1] = pt(major ? 166 : 176, i * 6);
+  const [x2, y2] = pt(182, i * 6);
+  tg.appendChild(svgEl('line', {
+    x1, y1, x2, y2,
+    stroke: major ? '#3a78d0' : '#9cc0e8',
+    'stroke-width':   major ? 3 : 1.5,
+    'stroke-linecap': 'round'
+  }));
+}
+
+// ── Minute numbers — 5, 10 … 60 on outer ring (r=150) ──────
+//
+// WHERE TO CHANGE POSITION: adjust the first argument of pt()
+//   increase → moves outward toward ticks
+//   decrease → moves inward toward hour numbers
+//
+// WHERE TO CHANGE STYLE: edit font-size, fill, font-weight
+//
+const mg = document.getElementById('minNums');
+for (let i = 1; i <= 12; i++) {
+  const [x, y] = pt(150, i * 30);
+  const t = svgEl('text', {
+    x, y,
+    'text-anchor':       'middle',
+    'dominant-baseline': 'central',
+    'font-size':         '14',
+    'font-weight':       '700',
+    'font-family':       '-apple-system, system-ui, sans-serif',
+    'fill':              'rgba(42, 110, 200, 0.72)'
+  });
+  t.textContent = i * 5;
+  mg.appendChild(t);
+}
+
+// ── Hour numbers — 1–12 on inner ring (r=108) ───────────────
+const hg = document.getElementById('hrNums');
+for (let i = 1; i <= 12; i++) {
+  const [x, y] = pt(108, i * 30);
+  const t = svgEl('text', {
+    x, y,
+    'text-anchor':       'middle',
+    'dominant-baseline': 'central',
+    'font-size':         '26',
+    'font-weight':       '900',
+    'font-family':       '-apple-system, system-ui, sans-serif',
+    'fill':              '#1a1e62'
+  });
+  t.textContent = i;
+  hg.appendChild(t);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLOCK TICK — updates every second
+// ═══════════════════════════════════════════════════════════
+const hHand   = document.getElementById('hHand');
+const mHand   = document.getElementById('mHand');
+const sHand   = document.getElementById('sHand');
+const digTime = document.getElementById('digTime');
+const digAmPm = document.getElementById('digAmPm');
+
+function tick() {
+  const now = new Date();
+  const s   = now.getSeconds();
+  const m   = now.getMinutes();
+  const h12 = now.getHours() % 12;
+
+  // Degrees for each hand (0° = 12 o'clock, clockwise)
+  const sDeg = s * 6;
+  const mDeg = m * 6 + s * 0.1;      // smooth minute hand
+  const hDeg = h12 * 30 + m * 0.5;   // smooth hour hand
+
+  hHand.setAttribute('transform', `rotate(${hDeg},200,200)`);
+  mHand.setAttribute('transform', `rotate(${mDeg},200,200)`);
+  sHand.setAttribute('transform', `rotate(${sDeg},200,200)`);
+
+  // Digital display
+  const dh = h12 === 0 ? 12 : h12;
+  digTime.textContent = `${dh}:${String(m).padStart(2, '0')}`;
+  digAmPm.textContent = now.getHours() < 12 ? 'AM' : 'PM';
+}
+
+tick();
+setInterval(tick, 1000);
+
+// ═══════════════════════════════════════════════════════════
+//  TAP HANDLER
+// ═══════════════════════════════════════════════════════════
+let hintShown = true;
+
+function onTap() {
+  // Hide hint after first tap (matches Swift showHint logic)
+  if (hintShown) {
+    document.getElementById('hint').classList.add('hidden');
+    hintShown = false;
+  }
+
+  // Ripple animation (matches Swift rippleScale/rippleOpacity)
+  const ring = document.getElementById('rippleRing');
+  ring.classList.remove('pop');
+  void ring.offsetWidth;          // force reflow so animation restarts cleanly
+  ring.classList.add('pop');
+
+  speakTime();
+}
+
+// ── Speech — mirrors Swift handleTap() phrase logic exactly ──
+function speakTime() {
+  if (!window.speechSynthesis) return;
+
+  const now  = new Date();
+  const m    = now.getMinutes();
+  const h12  = now.getHours() % 12;
+  const h    = h12 === 0 ? 12 : h12;
+  const next = h === 12 ? 1 : h + 1;
+  const left = 60 - m;
+
+  let phrase;
+  if      (m === 0)  phrase = `It's ${h} o'clock!`;
+  else if (m >= 1  && m <= 14) phrase = `It's ${m} minute${m === 1 ? '' : 's'} past ${h}`;
+  else if (m === 15) phrase = `It's quarter past ${h}`;
+  else if (m >= 16 && m <= 29) phrase = `It's ${m} minutes past ${h}`;
+  else if (m === 30) phrase = `It's half past ${h}`;
+  else if (m >= 31 && m <= 44) phrase = `It's ${left} minutes to ${next}`;
+  else if (m === 45) phrase = `It's quarter to ${next}`;
+  else               phrase = `It's ${left} minute${left === 1 ? '' : 's'} to ${next}`;
+
+  window.speechSynthesis.cancel();
+  const utt   = new SpeechSynthesisUtterance(phrase);
+  utt.rate    = 0.75;   // slow for small ears (matches Swift rate: 0.40 on a 0–1 scale)
+  utt.pitch   = 1.2;
+  utt.lang    = 'en-US';
+  window.speechSynthesis.speak(utt);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SCREEN WAKE LOCK (replaces Swift isIdleTimerDisabled)
+// ═══════════════════════════════════════════════════════════
+let wakeLock = null;
+
+async function keepAwake() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch (_) {
+    // Permission denied or not supported — clock still works fine
+  }
+}
+
+keepAwake();
+// Re-acquire after returning from background
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SERVICE WORKER — enables offline & installability
+// ═══════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // sw.js not present yet — app still works online
+    });
+  });
+}
+</script>
+</body>
+</html>
