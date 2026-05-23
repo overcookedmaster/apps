@@ -424,7 +424,7 @@ document.addEventListener('visibilitychange', () => {
 // ═══════════════════════════════════════════════════════════
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
       // sw.js not present yet — app still works online
     });
   });

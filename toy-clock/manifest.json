@@ -2,7 +2,7 @@
   "name": "Clock Teacher",
   "short_name": "ClockTeacher",
   "description": "Teach your child to read the time!",
-  "start_url": "/",
+  "start_url": "/toy-clock/",
   "display": "standalone",
   "background_color": "#c2dcfa",
   "theme_color": "#4A8FD9",
