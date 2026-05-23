@@ -1,5 +1,5 @@
 const CACHE = 'clock-teacher-v1';
-const URLS  = ['/', '/index.html', '/manifest.json'];
+const URLS  = ['/toy-clock/', '/toy-clock/index.html', '/toy-clock/manifest.json'];
 
 self.addEventListener('install', e => 
   e.waitUntil( 
