@@ -55,3 +55,4 @@ Each `index.html` should include these meta tags for proper iOS install behaviou
 ```
 
 Install flow: open URL in Safari → Share → Add to Home Screen.
+
